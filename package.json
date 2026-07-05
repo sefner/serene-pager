@@ -7,11 +7,18 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win --x64"
+    "dist": "electron-builder --win --x64",
+    "release": "electron-builder --win --x64 --publish always"
   },
   "build": {
     "appId": "dental.serene.pager",
     "productName": "Serene Pager",
+    "publish": {
+      "provider": "github",
+      "owner": "sefner",
+      "repo": "serene-pager",
+      "releaseType": "release"
+    },
     "files": [
       "main.js",
       "preload.js",
@@ -19,7 +26,10 @@
       "assets/**"
     ],
     "extraFiles": [
-      { "from": "test-launchers", "to": "." }
+      {
+        "from": "test-launchers",
+        "to": "."
+      }
     ],
     "win": {
       "target": [
@@ -38,5 +48,8 @@
   "devDependencies": {
     "electron": "^32.0.0",
     "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

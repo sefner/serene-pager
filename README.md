@@ -50,7 +50,38 @@ npm run dist
 ```
 
 This produces an `.exe` installer under `dist/`. Copy it to each of the 6
-operatory computers and run it once.
+operatory computers and run it once. **Use the `Serene Pager Setup x.y.z.exe`
+installer, not the zip** — only installed copies auto-update.
+
+## Shipping an update (no office visit needed)
+
+Installed stations check the GitHub releases of `sefner/serene-pager` on
+launch and every 4 hours, download new versions in the background, and install
+them silently — right away if the machine was just turned on, otherwise at
+3 AM or on quit. Hover the tray icon to see which version a station is running.
+
+One-time setup: make the `sefner/serene-pager` repo **public** (stations
+download release files anonymously; a private repo would need a token baked
+into every machine).
+
+Then for every release:
+
+```bash
+# 1. bump "version" in package.json (e.g. 0.1.0 -> 0.2.0), commit
+# 2. tag and push:
+git tag v0.2.0
+git push && git push --tags
+```
+
+Pushing the tag triggers the GitHub Actions workflow
+(`.github/workflows/release.yml`), which builds the installer on a Windows
+runner and publishes the release; every station picks it up automatically
+within a few hours. Don't delete old releases the moment a new one is out — a
+station mid-download could be fetching them.
+
+(Local alternative: `GH_TOKEN=... npm run release` builds and publishes from
+this machine, but building the Windows installer from Linux/WSL requires
+`wine` — the Actions route avoids that.)
 
 ## Deployment notes (important)
 

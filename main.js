@@ -1,6 +1,7 @@
 'use strict';
 
 const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -149,6 +150,40 @@ function onMessage(buf, rinfo) {
   }
 }
 
+// ---- Auto-update ----------------------------------------------------------
+// Stations pull new versions from the GitHub releases of this repo, so updates
+// roll out without visiting the office. The app runs all day in the tray, so
+// "install on quit" alone would never fire; instead:
+//   - right after launch (machine just booted, nobody paging yet): restart
+//     into the new version immediately,
+//   - later in the day: install silently at 3 AM, or whenever the app quits.
+const UPDATE_CHECK_MS = 4 * 60 * 60 * 1000;
+const STARTUP_GRACE_MS = 10 * 60 * 1000;
+const launchedAt = Date.now();
+
+function installUpdateNow() {
+  app.isQuitting = true;
+  autoUpdater.quitAndInstall(true /* silent */, true /* relaunch */);
+}
+
+function startAutoUpdate() {
+  if (!app.isPackaged || PROFILE) return; // dev runs and test profiles never update
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('error', (err) => console.error('auto-update error:', err && err.message));
+  autoUpdater.on('update-downloaded', (info) => {
+    if (Date.now() - launchedAt < STARTUP_GRACE_MS) { installUpdateNow(); return; }
+    if (tray) tray.setToolTip(`Serene Pager v${app.getVersion()} — v${info.version} installs overnight`);
+    const next3am = new Date();
+    next3am.setHours(3, 0, 0, 0);
+    if (next3am.getTime() <= Date.now()) next3am.setDate(next3am.getDate() + 1);
+    setTimeout(installUpdateNow, next3am.getTime() - Date.now());
+  });
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  check();
+  setInterval(check, UPDATE_CHECK_MS);
+}
+
 // ---- Incoming page presentation -----------------------------------------
 function handleIncoming(m) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -264,7 +299,7 @@ function createTray() {
   let img = nativeImage.createFromPath(ICON_PATH);
   if (!img.isEmpty()) img = img.resize({ width: 16, height: 16 });
   tray = new Tray(img);
-  tray.setToolTip('Serene Pager');
+  tray.setToolTip(`Serene Pager v${app.getVersion()}`); // version visible on hover — easy way to confirm a station updated
   const menu = Menu.buildFromTemplate([
     { label: 'Open Serene Pager', click: () => { mainWindow.show(); mainWindow.focus(); } },
     { type: 'separator' },
@@ -320,7 +355,12 @@ if (!PROFILE && !app.requestSingleInstanceLock()) {
     createWindow();
     if (!PROFILE) createTray();
     startNetwork();
+    startAutoUpdate();
   });
+
+  // Any programmatic quit (e.g. the auto-updater restarting into a new
+  // version) must not be swallowed by the hide-to-tray close handler.
+  app.on('before-quit', () => { app.isQuitting = true; });
 
   // Normal install stays alive in the tray; test copies quit when closed.
   app.on('window-all-closed', () => { if (PROFILE) app.quit(); });
