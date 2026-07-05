@@ -1,6 +1,6 @@
 {
   "name": "lan-pager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Peer-to-peer LAN pager for dental operatories (no server required)",
   "main": "main.js",
   "author": "",
