@@ -150,7 +150,10 @@ async function sendPage(text) {
   if (!hasTarget()) return; // shouldn't happen (buttons disabled), but be safe
   const to = allMode ? 'ALL' : [...selectedTargets];
   const id = await window.pager.sendPage({ to, text });
-  sentLog.unshift({ id, text, to, ts: Date.now(), acks: [], cancelled: false, doneAt: 0 });
+  // Who has to acknowledge before this page counts as done: for "Everyone",
+  // snapshot the stations online right now (late joiners never receive it).
+  const expected = allMode ? currentRoster.map((s) => s.name) : [...selectedTargets];
+  sentLog.unshift({ id, text, to, expected, ts: Date.now(), acks: [], cancelled: false, doneAt: 0 });
   if (sentLog.length > SENT_KEEP) sentLog.pop();
   renderSent();
   const who = allMode ? 'everyone' : [...selectedTargets].join(', ');
@@ -173,20 +176,18 @@ function timeAgo(ts) {
 }
 
 function isFullyAcked(s) {
-  return s.to !== 'ALL' && s.to.every((t) => s.acks.includes(t));
+  return s.expected.length > 0 && s.expected.every((t) => s.acks.includes(t));
 }
 
 function sentStatus(s) {
   if (s.cancelled) return { text: 'cancelled', ok: false };
-  const acked = s.acks.join(', ');
   if (isFullyAcked(s)) return { text: '✓ acknowledged', ok: true };
-  if (s.to === 'ALL') {
-    return acked
-      ? { text: `✓ ${acked}`, ok: true }
-      : { text: `awaiting ✓ · sent ${timeAgo(s.ts)}`, ok: false };
-  }
-  const waiting = s.to.filter((t) => !s.acks.includes(t)).join(', ');
-  return { text: (acked ? `✓ ${acked} · ` : '') + `awaiting ${waiting} · sent ${timeAgo(s.ts)}`, ok: false };
+  const acked = s.acks.join(', ');
+  const waiting = s.expected.filter((t) => !s.acks.includes(t)).join(', ');
+  return {
+    text: (acked ? `✓ ${acked} · ` : '') + `awaiting ${waiting || '✓'} · sent ${timeAgo(s.ts)}`,
+    ok: false,
+  };
 }
 
 async function cancelSent(s) {
