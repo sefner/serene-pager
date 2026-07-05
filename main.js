@@ -32,6 +32,8 @@ let socket = null;
 let dndUntil = 0;                 // epoch ms until which Do-Not-Disturb is active (0 = off)
 const roster = new Map();        // name -> { name, address, last, dnd }
 const seenPages = new Set();     // page ids we've already handled (dedupe broadcasts)
+const seenAcks = new Set();      // "pageId|acker" pairs already shown
+const seenCancels = new Set();   // cancel ids already handled
 app.isQuitting = false;
 
 function isDnd() { return dndUntil > Date.now(); }
@@ -77,6 +79,14 @@ function sendPacket(obj) {
       if (err) console.error('send error', addr, err.message);
     });
   }
+}
+
+// UDP is fire-and-forget: a single dropped packet would silently lose a page.
+// Send everything that matters a few times — receivers dedupe by id, so the
+// repeats cost nothing and a page only vanishes if all three sends drop.
+const RESEND_DELAYS_MS = [0, 400, 900];
+function sendReliable(obj) {
+  for (const d of RESEND_DELAYS_MS) setTimeout(() => sendPacket(obj), d);
 }
 
 function startNetwork() {
@@ -144,7 +154,22 @@ function onMessage(buf, rinfo) {
       break;
     }
     case 'ack': {
+      if (m.to !== config.name) return;               // only the page's sender cares
+      const key = m.id + '|' + m.from;
+      if (seenAcks.has(key)) return;                  // dedupe resends
+      seenAcks.add(key);
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('ack', m);
+      break;
+    }
+    case 'cancel': {
+      if (m.from === config.name) return;             // ignore our own broadcast
+      if (seenCancels.has(m.id)) return;              // dedupe resends
+      const forMe = m.to === 'ALL'
+        || m.to === config.name
+        || (Array.isArray(m.to) && m.to.includes(config.name));
+      if (!forMe) return;
+      seenCancels.add(m.id);
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('cancelled', m);
       break;
     }
   }
@@ -230,12 +255,18 @@ ipcMain.handle('send-page', (_e, { to, text }) => {
   const id = crypto.randomUUID();
   const packet = { type: 'page', id, from: config.name, to, text, ts: Date.now() };
   seenPages.add(id); // never show our own page to ourselves
-  sendPacket(packet);
+  sendReliable(packet);
   return id;
 });
 
+// Sender changed their mind ("never mind") — targeted stations drop the page.
+ipcMain.handle('cancel-page', (_e, { id, to }) => {
+  seenCancels.add(id); // never process our own cancel
+  sendReliable({ type: 'cancel', id, from: config.name, to });
+});
+
 ipcMain.handle('acknowledge', (_e, page) => {
-  sendPacket({ type: 'ack', id: page.id, from: config.name, to: page.from });
+  sendReliable({ type: 'ack', id: page.id, from: config.name, to: page.from });
   clearAlert();
 });
 

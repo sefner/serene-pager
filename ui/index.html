@@ -52,18 +52,21 @@
 
     <div id="empty" class="muted hidden">No other stations online yet. Waiting…</div>
 
+    <div id="sent" class="sent hidden">
+      <h2>Sent</h2>
+      <div id="sent-list"></div>
+    </div>
+
     <div id="quiet" class="quiet hidden">
       <h2>Received while snoozed</h2>
       <div id="quiet-list"></div>
     </div>
   </section>
 
-  <!-- Incoming page overlay -->
+  <!-- Incoming page overlay — pages stack here until each is acknowledged -->
   <div id="alert" class="alert hidden">
     <div class="alert-card">
-      <div class="alert-from"><span id="alert-from"></span></div>
-      <div id="alert-text" class="alert-text"></div>
-      <button id="alert-ack" class="primary big">Acknowledge</button>
+      <div id="alert-list"></div>
     </div>
   </div>
 

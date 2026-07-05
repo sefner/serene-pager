@@ -139,3 +139,24 @@ button.link { background: none; border: none; color: var(--muted); font-size: 13
   transition: opacity .2s ease; max-width: 90%;
 }
 .toast.show { opacity: 1; }
+
+/* ---- Stacked incoming pages ---- */
+.alert-card { max-height: 84vh; overflow-y: auto; }
+.alert-item + .alert-item { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 20px; }
+.alert-when { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+.alert-item .big { margin-top: 14px; }
+
+/* ---- Sent status ---- */
+.sent { margin-top: 18px; }
+.sent-item {
+  font-size: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px;
+  margin-bottom: 8px; background: var(--card);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left;
+}
+.sent-item b { color: var(--brand); }
+.sent-item .to { color: var(--muted); }
+.sent-item .status { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.sent-item .status.ok { color: var(--brand); font-weight: 600; }
+
+.quiet-item.cancelled span { text-decoration: line-through; color: var(--muted); }
+.quiet-item.cancelled b { color: var(--muted); }

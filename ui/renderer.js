@@ -149,9 +149,85 @@ function renderMessages() {
 async function sendPage(text) {
   if (!hasTarget()) return; // shouldn't happen (buttons disabled), but be safe
   const to = allMode ? 'ALL' : [...selectedTargets];
-  await window.pager.sendPage({ to, text });
+  const id = await window.pager.sendPage({ to, text });
+  sentLog.unshift({ id, text, to, ts: Date.now(), acks: [], cancelled: false, doneAt: 0 });
+  if (sentLog.length > SENT_KEEP) sentLog.pop();
+  renderSent();
   const who = allMode ? 'everyone' : [...selectedTargets].join(', ');
   toast(`Sent to ${who}: ${text}`);
+}
+
+// ---- Sent status (so the sender knows a page was seen — or can cancel it) --
+const sentLog = [];                    // { id, text, to, ts, acks, cancelled, doneAt }
+const SENT_KEEP = 5;                   // show at most this many recent pages
+const SENT_DONE_LINGER_MS = 60000;     // acked/cancelled rows fade out after a minute
+
+function timeOf(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+function timeAgo(ts) {
+  const mins = Math.round((Date.now() - ts) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  return `${Math.floor(mins / 60)} hr ${mins % 60} min ago`;
+}
+
+function isFullyAcked(s) {
+  return s.to !== 'ALL' && s.to.every((t) => s.acks.includes(t));
+}
+
+function sentStatus(s) {
+  if (s.cancelled) return { text: 'cancelled', ok: false };
+  const acked = s.acks.join(', ');
+  if (isFullyAcked(s)) return { text: '✓ acknowledged', ok: true };
+  if (s.to === 'ALL') {
+    return acked
+      ? { text: `✓ ${acked}`, ok: true }
+      : { text: `awaiting ✓ · sent ${timeAgo(s.ts)}`, ok: false };
+  }
+  const waiting = s.to.filter((t) => !s.acks.includes(t)).join(', ');
+  return { text: (acked ? `✓ ${acked} · ` : '') + `awaiting ${waiting} · sent ${timeAgo(s.ts)}`, ok: false };
+}
+
+async function cancelSent(s) {
+  await window.pager.cancelPage({ id: s.id, to: s.to });
+  s.cancelled = true;
+  s.doneAt = Date.now();
+  renderSent();
+}
+
+function renderSent() {
+  // Finished rows (acked or cancelled) drop off after lingering briefly.
+  const now = Date.now();
+  for (let i = sentLog.length - 1; i >= 0; i--) {
+    if (sentLog[i].doneAt && now - sentLog[i].doneAt > SENT_DONE_LINGER_MS) sentLog.splice(i, 1);
+  }
+  const list = $('sent-list');
+  list.innerHTML = '';
+  for (const s of sentLog) {
+    const row = document.createElement('div');
+    row.className = 'sent-item';
+    const info = document.createElement('div');
+    const line = document.createElement('div');
+    line.innerHTML = '<b></b><span class="to"></span>';
+    line.querySelector('b').textContent = s.text;
+    line.querySelector('.to').textContent = ' → ' + (s.to === 'ALL' ? 'everyone' : s.to.join(', '));
+    const status = document.createElement('div');
+    const st = sentStatus(s);
+    status.className = 'status' + (st.ok ? ' ok' : '');
+    status.textContent = st.text;
+    info.append(line, status);
+    row.appendChild(info);
+    if (!s.cancelled && !isFullyAcked(s)) {
+      const cancel = document.createElement('button');
+      cancel.className = 'link';
+      cancel.textContent = 'Cancel';
+      cancel.onclick = () => cancelSent(s);
+      row.appendChild(cancel);
+    }
+    list.appendChild(row);
+  }
+  $('sent').classList.toggle('hidden', sentLog.length === 0);
 }
 
 // ---- Do Not Disturb ------------------------------------------------------
@@ -172,38 +248,68 @@ function reflectDnd() {
   if (on) dndTimer = setTimeout(reflectDnd, Math.max(500, dndUntil - Date.now()));
 }
 
-// ---- Incoming alert ------------------------------------------------------
-let pendingPage = null;
+// ---- Incoming alert (queue — pages stack until each is acknowledged) ------
+let pendingPages = [];
 
 function showAlert(page) {
-  pendingPage = page;
-  $('alert-from').textContent = page.from || 'Unknown';
-  $('alert-text').textContent = page.text || 'Page';
-  $('alert').classList.remove('hidden');
+  pendingPages.push(page);
+  renderAlerts();
   beep();
   speak(`${page.text}. From ${page.from}`);
 }
 
-$('alert-ack').onclick = async () => {
-  if (pendingPage) await window.pager.acknowledge(pendingPage);
-  pendingPage = null;
-  $('alert').classList.add('hidden');
-  stopBeep();
-};
+function renderAlerts() {
+  const list = $('alert-list');
+  list.innerHTML = '';
+  for (const p of pendingPages) {
+    const item = document.createElement('div');
+    item.className = 'alert-item';
+    const from = document.createElement('div');
+    from.className = 'alert-from';
+    from.innerHTML = '<span></span><span class="alert-when"></span>';
+    from.querySelector('span').textContent = p.from || 'Unknown';
+    from.querySelector('.alert-when').textContent = ` · ${timeOf(p.ts)} (${timeAgo(p.ts)})`;
+    const text = document.createElement('div');
+    text.className = 'alert-text';
+    text.textContent = p.text || 'Page';
+    const btn = document.createElement('button');
+    btn.className = 'primary big';
+    btn.textContent = 'Acknowledge';
+    btn.onclick = async () => {
+      await window.pager.acknowledge(p);
+      removePending(p.id);
+    };
+    item.append(from, text, btn);
+    list.appendChild(item);
+  }
+  $('alert').classList.toggle('hidden', pendingPages.length === 0);
+}
+
+function removePending(id) {
+  pendingPages = pendingPages.filter((p) => p.id !== id);
+  renderAlerts();
+  if (pendingPages.length === 0) {
+    stopBeep();
+    window.pager.dismiss(); // stop flashing / drop always-on-top
+  }
+}
 
 function logQuiet(page) {
   quietLog.unshift(page);
   if (quietLog.length > 10) quietLog.pop();
+  renderQuiet();
+}
+
+function renderQuiet() {
   const list = $('quiet-list');
   list.innerHTML = '';
   for (const p of quietLog) {
     const div = document.createElement('div');
-    div.className = 'quiet-item';
-    const time = new Date(p.ts || Date.now()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    div.className = 'quiet-item' + (p.cancelled ? ' cancelled' : '');
     div.innerHTML = `<b></b><span></span><span class="t"></span>`;
     div.querySelector('b').textContent = p.from + ': ';
-    div.querySelectorAll('span')[0].textContent = p.text;
-    div.querySelector('.t').textContent = time;
+    div.querySelectorAll('span')[0].textContent = p.text + (p.cancelled ? ' (no longer needed)' : '');
+    div.querySelector('.t').textContent = timeOf(p.ts || Date.now());
     list.appendChild(div);
   }
   $('quiet').classList.remove('hidden');
@@ -276,7 +382,28 @@ window.pager.onIncoming((page) => {
   if (page.silent) { logQuiet(page); toast(`🔕 ${page.from}: ${page.text}`); }
   else showAlert(page);
 });
-window.pager.onAck((ack) => toast(`✓ ${ack.from} acknowledged`));
+window.pager.onAck((ack) => {
+  const s = sentLog.find((x) => x.id === ack.id);
+  if (s && !s.acks.includes(ack.from)) {
+    s.acks.push(ack.from);
+    if (isFullyAcked(s)) s.doneAt = Date.now();
+    renderSent();
+  }
+  toast(`✓ ${ack.from} acknowledged`);
+});
+window.pager.onCancelled((c) => {
+  const wasPending = pendingPages.some((p) => p.id === c.id);
+  if (wasPending) removePending(c.id);
+  const q = quietLog.find((p) => p.id === c.id);
+  if (q && !q.cancelled) { q.cancelled = true; renderQuiet(); }
+  if (wasPending || q) toast(`${c.from} cancelled the page — no longer needed`);
+});
+
+// Keep "N min ago" ages fresh, and let finished Sent rows fade out.
+setInterval(() => {
+  if (pendingPages.length) renderAlerts();
+  renderSent();
+}, 30000);
 
 $('rename').onclick = () => { renderSetup(); show('setup'); };
 

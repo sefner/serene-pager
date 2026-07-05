@@ -13,6 +13,13 @@ server, so it can go away without breaking paging.
 - **Spoken pages** — the receiving computer says the message aloud (e.g.
   "Doctor needed. From Front Desk") in addition to a chime, for hands-busy rooms.
 - **Acknowledge** — the sender sees a "✓ acknowledged" receipt.
+- **Sent status + Cancel** — a "Sent" list shows each page as "awaiting ✓" until
+  every recipient acknowledges; a Cancel button withdraws a page that's no
+  longer needed and removes it from the recipient's screen.
+- **Unattended stations** — incoming pages stack up on screen with the time
+  received (and how long ago), so someone returning to a station sees every
+  page that came in, not just the latest. Anything still showing is still
+  wanted — cancelled pages remove themselves.
 - **Do Not Disturb / snooze** — a station can go quiet for 30 min; pages still
   arrive silently in a "Received while snoozed" list, and other stations see 🔕
   next to that room. Auto-resumes so nobody stays muted all day.
@@ -26,6 +33,8 @@ server, so it can go away without breaking paging.
 - Sending a page broadcasts a small UDP packet; only the targeted station (or
   "Everyone") shows it. The receiver can **Acknowledge**, which sends a receipt
   back to the sender.
+- Pages, acks, and cancels are each broadcast 3× over ~1 second and deduped by
+  id on arrival, so a single dropped packet can't silently lose a page.
 - Station name is stored per-computer; auto-start on Windows login is enabled on
   first run.
 
