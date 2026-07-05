@@ -1,0 +1,29 @@
+SERENE PAGER — testing several stations on ONE computer
+====================================================
+
+1. Unzip this whole folder anywhere (e.g. your Desktop).
+
+2. Double-click two or more of these launchers:
+       Op 1.bat
+       Op 2.bat
+       Front Desk.bat
+       Doctor.bat
+
+   Each opens its OWN pager window, already named, and they can page
+   each other right on this one computer.
+
+3. Try it:
+   - In the "Op 1" window, pick a target (e.g. Op 2) and tap a message
+     like "Doctor needed".
+   - The "Op 2" window pops to the front, chimes, and speaks the message.
+   - Click Acknowledge — "Op 1" shows a "acknowledged" receipt.
+   - Try "Do Not Disturb" in one window and page it: it stays quiet and
+     the page lands in "Received while snoozed".
+
+Notes
+-----
+- Windows Firewall may ask on first run. Click "Allow access" (Private).
+- Closing a test window just closes that copy.
+- These launchers are ONLY for testing multiple names on one machine.
+  On the real office computers you just run "Serene Pager.exe" normally and
+  each computer picks its own name once.

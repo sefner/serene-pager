@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; font-src data:; img-src data:;" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Serene Pager</title>
+</head>
+<body>
+  <!-- Practice brand bar (shown on every screen) -->
+  <div class="brandbar">
+    <div class="brand-mark" role="img" aria-label="Serene Dentistry"></div>
+    <div class="brand-word">Serene <b>Pager</b></div>
+  </div>
+
+  <!-- First-run setup: pick this computer's station name -->
+  <section id="setup" class="screen hidden">
+    <h1>Which station is this?</h1>
+    <p class="muted">Pick the name for this computer. Everyone on the network will see it.</p>
+    <div id="setup-presets" class="preset-grid"></div>
+    <div class="row">
+      <input id="setup-input" type="text" placeholder="Or type a custom name" maxlength="40" />
+      <button id="setup-save" class="primary">Save</button>
+    </div>
+  </section>
+
+  <!-- Main paging screen -->
+  <section id="main" class="screen hidden">
+    <header>
+      <div>
+        <div class="label">This station</div>
+        <div id="me" class="me"></div>
+      </div>
+      <div class="header-actions">
+        <button id="dnd" class="dnd-btn">Do Not Disturb</button>
+        <button id="rename" class="link">rename</button>
+      </div>
+    </header>
+
+    <div id="dnd-banner" class="dnd-banner hidden">
+      <span>🔕 Snoozed — pages arrive silently.</span>
+      <button id="dnd-off" class="link">resume</button>
+    </div>
+
+    <h2>Send to <span class="hint">(pick one or more)</span></h2>
+    <div id="targets" class="target-grid"></div>
+
+    <h2>Message</h2>
+    <div id="msg-hint" class="msg-hint hidden">👆 Pick a station above first.</div>
+    <div id="messages" class="msg-grid"></div>
+
+    <div id="empty" class="muted hidden">No other stations online yet. Waiting…</div>
+
+    <div id="quiet" class="quiet hidden">
+      <h2>Received while snoozed</h2>
+      <div id="quiet-list"></div>
+    </div>
+  </section>
+
+  <!-- Incoming page overlay -->
+  <div id="alert" class="alert hidden">
+    <div class="alert-card">
+      <div class="alert-from"><span id="alert-from"></span></div>
+      <div id="alert-text" class="alert-text"></div>
+      <button id="alert-ack" class="primary big">Acknowledge</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

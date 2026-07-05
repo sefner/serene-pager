@@ -1,0 +1,42 @@
+{
+  "name": "lan-pager",
+  "version": "0.1.0",
+  "description": "Peer-to-peer LAN pager for dental operatories (no server required)",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "dental.serene.pager",
+    "productName": "Serene Pager",
+    "files": [
+      "main.js",
+      "preload.js",
+      "ui/**",
+      "assets/**"
+    ],
+    "extraFiles": [
+      { "from": "test-launchers", "to": "." }
+    ],
+    "win": {
+      "target": [
+        "zip",
+        "nsis"
+      ],
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}
