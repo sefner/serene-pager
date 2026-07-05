@@ -408,4 +408,12 @@ setInterval(() => {
 
 $('rename').onclick = () => { renderSetup(); show('setup'); };
 
+// Ask the main process to re-fit the window height whenever content changes
+// (sections toggling, lists growing) — debounced so bursts measure once.
+let refitTimer = null;
+new MutationObserver(() => {
+  clearTimeout(refitTimer);
+  refitTimer = setTimeout(() => window.pager.refit(), 250);
+}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+
 init();

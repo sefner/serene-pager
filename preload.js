@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('pager', {
   acknowledge: (page) => ipcRenderer.invoke('acknowledge', page),
   cancelPage: (payload) => ipcRenderer.invoke('cancel-page', payload),
   dismiss: () => ipcRenderer.invoke('dismiss'),
+  refit: () => ipcRenderer.invoke('refit'),
   onRoster: (cb) => ipcRenderer.on('roster', (_e, d) => cb(d)),
   onIncoming: (cb) => ipcRenderer.on('incoming', (_e, d) => cb(d)),
   onAck: (cb) => ipcRenderer.on('ack', (_e, d) => cb(d)),

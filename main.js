@@ -272,6 +272,8 @@ ipcMain.handle('acknowledge', (_e, page) => {
 
 ipcMain.handle('dismiss', () => clearAlert());
 
+ipcMain.handle('refit', () => fitWindow());
+
 // ---- Window + tray -------------------------------------------------------
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -312,18 +314,21 @@ function createWindow() {
 
   mainWindow.webContents.on('did-finish-load', () => {
     pushRoster();
-    // Size the window to its actual content so there's no dead space at the
-    // bottom, and it grows a little once the roster of stations fills in.
-    const fit = async () => {
-      try {
-        const h = await mainWindow.webContents.executeJavaScript('document.body.scrollHeight');
-        const [w] = mainWindow.getContentSize();
-        mainWindow.setContentSize(w, Math.min(Math.max(Math.ceil(h), 460), 900));
-      } catch { /* window gone */ }
-    };
-    setTimeout(fit, 400);
-    setTimeout(fit, 1800); // re-fit after the first heartbeats populate the roster
+    setTimeout(fitWindow, 400);
+    setTimeout(fitWindow, 1800); // re-fit after the first heartbeats populate the roster
   });
+}
+
+// Size the window to its actual content so there's no dead space at the
+// bottom and no scrollbar when a section (Sent, snoozed log, roster) appears.
+// The renderer requests this whenever its content changes.
+async function fitWindow() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMaximized()) return;
+    const h = await mainWindow.webContents.executeJavaScript('document.body.scrollHeight');
+    const [w] = mainWindow.getContentSize();
+    mainWindow.setContentSize(w, Math.min(Math.max(Math.ceil(h), 460), 900));
+  } catch { /* window gone */ }
 }
 
 function createTray() {
