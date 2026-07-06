@@ -146,9 +146,22 @@ function renderMessages() {
   }
 }
 
+const REPEAT_SUPPRESS_MS = 10000; // identical repeat-taps within this window don't resend
+
+function sameTargets(a, b) {
+  if (a === 'ALL' || b === 'ALL') return a === b;
+  return a.length === b.length && a.every((t) => b.includes(t));
+}
+
 async function sendPage(text) {
   if (!hasTarget()) return; // shouldn't happen (buttons disabled), but be safe
   const to = allMode ? 'ALL' : [...selectedTargets];
+  const dup = sentLog.find((s) => !s.cancelled && s.text === text
+    && sameTargets(s.to, to) && Date.now() - s.ts < REPEAT_SUPPRESS_MS);
+  if (dup) {
+    toast(isFullyAcked(dup) ? `Already sent & acknowledged: ${text}` : `Already sent — awaiting ✓: ${text}`);
+    return;
+  }
   const id = await window.pager.sendPage({ to, text });
   // Who has to acknowledge before this page counts as done: for "Everyone",
   // snapshot the stations online right now (late joiners never receive it).
@@ -253,7 +266,11 @@ function reflectDnd() {
 let pendingPages = [];
 
 function showAlert(page) {
-  pendingPages.push(page);
+  // The same message from the same station coalesces into one card (marked
+  // ×N) instead of stacking duplicates that each demand an acknowledge.
+  const dup = pendingPages.find((p) => p.from === page.from && p.text === page.text);
+  if (dup) dup.repeats = (dup.repeats || []).concat(page); // acked together later
+  else pendingPages.push(page);
   renderAlerts();
   beep();
   speak(`${page.text}. From ${page.from}`);
@@ -272,12 +289,13 @@ function renderAlerts() {
     from.querySelector('.alert-when').textContent = ` · ${timeOf(p.ts)} (${timeAgo(p.ts)})`;
     const text = document.createElement('div');
     text.className = 'alert-text';
-    text.textContent = p.text || 'Page';
+    text.textContent = (p.text || 'Page') + (p.repeats ? ` ×${p.repeats.length + 1}` : '');
     const btn = document.createElement('button');
     btn.className = 'primary big';
     btn.textContent = 'Acknowledge';
     btn.onclick = async () => {
-      await window.pager.acknowledge(p);
+      // Ack every coalesced copy so each shows ✓ in the sender's Sent list.
+      for (const pg of [p, ...(p.repeats || [])]) await window.pager.acknowledge(pg);
       removePending(p.id);
     };
     item.append(from, text, btn);
@@ -393,11 +411,13 @@ window.pager.onAck((ack) => {
   toast(`✓ ${ack.from} acknowledged`);
 });
 window.pager.onCancelled((c) => {
-  const wasPending = pendingPages.some((p) => p.id === c.id);
-  if (wasPending) removePending(c.id);
+  // Cancelling any copy of a coalesced page withdraws the whole card — the
+  // sender no longer needs that message, however many times it was tapped.
+  const hit = pendingPages.find((p) => p.id === c.id || (p.repeats || []).some((r) => r.id === c.id));
+  if (hit) removePending(hit.id);
   const q = quietLog.find((p) => p.id === c.id);
   if (q && !q.cancelled) { q.cancelled = true; renderQuiet(); }
-  if (wasPending || q) toast(`${c.from} cancelled the page — no longer needed`);
+  if (hit || q) toast(`${c.from} cancelled the page — no longer needed`);
 });
 
 // Keep "N min ago" ages fresh, and let finished Sent rows fade out.
