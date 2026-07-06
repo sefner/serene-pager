@@ -215,6 +215,11 @@ function handleIncoming(m) {
   const silent = isDnd();
   mainWindow.webContents.send('incoming', { ...m, silent });
   if (silent) return; // Do-Not-Disturb: log it quietly, no pop-up / sound / focus-steal
+  presentWindow();
+}
+
+function presentWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isMinimized()) mainWindow.restore(); // un-minimize reliably (show() alone isn't enough on Windows)
   mainWindow.show();                                  // un-hide from the tray
   mainWindow.setAlwaysOnTop(true, 'screen-saver');
@@ -273,6 +278,10 @@ ipcMain.handle('acknowledge', (_e, page) => {
 ipcMain.handle('dismiss', () => clearAlert());
 
 ipcMain.handle('refit', () => fitWindow());
+
+// Renderer needs attention (e.g. snoozed pages promoted to live alerts when
+// DND ends) — same presentation as a fresh incoming page.
+ipcMain.handle('raise', () => presentWindow());
 
 // ---- Window + tray -------------------------------------------------------
 function createWindow() {

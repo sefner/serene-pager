@@ -253,8 +253,11 @@ async function setDnd(minutes) {
   reflectDnd();
 }
 
+let wasDnd = false;
 function reflectDnd() {
   const on = dndUntil > Date.now();
+  if (wasDnd && !on) promoteQuiet(); // snooze just ended (manually or auto)
+  wasDnd = on;
   $('dnd').classList.toggle('on', on);
   $('dnd').textContent = on ? 'Snoozing…' : 'Do Not Disturb';
   $('dnd-banner').classList.toggle('hidden', !on);
@@ -265,15 +268,34 @@ function reflectDnd() {
 // ---- Incoming alert (queue — pages stack until each is acknowledged) ------
 let pendingPages = [];
 
-function showAlert(page) {
-  // The same message from the same station coalesces into one card (marked
-  // ×N) instead of stacking duplicates that each demand an acknowledge.
+// The same message from the same station coalesces into one card (marked
+// ×N) instead of stacking duplicates that each demand an acknowledge.
+function queuePage(page) {
   const dup = pendingPages.find((p) => p.from === page.from && p.text === page.text);
   if (dup) dup.repeats = (dup.repeats || []).concat(page); // acked together later
   else pendingPages.push(page);
+}
+
+function showAlert(page) {
+  queuePage(page);
   renderAlerts();
   beep();
   speak(`${page.text}. From ${page.from}`);
+}
+
+// Snooze defers pages, it doesn't discard them: when DND ends, everything
+// that arrived quietly (and wasn't cancelled) becomes a live alert to
+// acknowledge — original timestamps intact, so ages read true.
+function promoteQuiet() {
+  const due = quietLog.filter((p) => !p.cancelled);
+  quietLog.length = 0;
+  renderQuiet();
+  if (!due.length) return;
+  for (const p of due) queuePage(p);
+  renderAlerts();
+  window.pager.raise(); // window may be hidden in the tray on auto-resume
+  beep();
+  speak(due.length === 1 ? 'One page arrived while snoozed' : `${due.length} pages arrived while snoozed`);
 }
 
 function renderAlerts() {
@@ -331,7 +353,7 @@ function renderQuiet() {
     div.querySelector('.t').textContent = timeOf(p.ts || Date.now());
     list.appendChild(div);
   }
-  $('quiet').classList.remove('hidden');
+  $('quiet').classList.toggle('hidden', quietLog.length === 0);
 }
 
 // ---- Spoken page (Web Speech API — no library, no asset) ------------------

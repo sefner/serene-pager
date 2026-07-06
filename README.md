@@ -22,7 +22,10 @@ server, so it can go away without breaking paging.
   wanted — cancelled pages remove themselves.
 - **Do Not Disturb / snooze** — a station can go quiet for 30 min; pages still
   arrive silently in a "Received while snoozed" list, and other stations see 🔕
-  next to that room. Auto-resumes so nobody stays muted all day.
+  next to that room. Auto-resumes so nobody stays muted all day. When the
+  snooze ends, un-cancelled snoozed pages pop up as live alerts (with their
+  original arrival times) so they still get acknowledged — snooze defers
+  pages, it never swallows them.
 - Lives in the system tray, auto-starts on Windows login, always-on-top alerts.
 - No patient data in messages (room/role only) → clear of HIPAA data handling.
 
