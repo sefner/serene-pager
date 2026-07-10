@@ -297,6 +297,11 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // A pager station is unattended — a page arrives with no click/keypress,
+      // so Chromium's autoplay gate would reject Audio.play() (which is why the
+      // app originally used speechSynthesis, the only gesture-exempt option).
+      // Allow audio without a user gesture so the pre-rendered voice clips play.
+      autoplayPolicy: 'no-user-gesture-required',
     },
   });
 
