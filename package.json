@@ -25,6 +25,9 @@
       "ui/**",
       "assets/**"
     ],
+    "asarUnpack": [
+      "assets/voice/**"
+    ],
     "extraFiles": [
       {
         "from": "test-launchers",
