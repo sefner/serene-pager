@@ -5,10 +5,9 @@ const MESSAGES = [
   { text: 'Doctor needed', urgent: true },
   { text: 'Assistance needed', urgent: true },
   { text: 'Room ready' },
-  { text: 'Hygiene check' },
+  { text: 'Patient Ready' },
+  { text: 'Perio Chart' },
   { text: 'Ready for exam' },
-  { text: 'Phone – Line 1' },
-  { text: 'Phone – Line 2' },
   { text: 'Come when free' },
 ];
 
@@ -280,7 +279,7 @@ function showAlert(page) {
   queuePage(page);
   renderAlerts();
   beep();
-  speak(`${page.text}. From ${page.from}`);
+  speakPage(page);
 }
 
 // Snooze defers pages, it doesn't discard them: when DND ends, everything
@@ -354,6 +353,57 @@ function renderQuiet() {
     list.appendChild(div);
   }
   $('quiet').classList.toggle('hidden', quietLog.length === 0);
+}
+
+// ---- Spoken page (pre-rendered premium clips, with system-voice fallback) --
+// A calm, spa-quality voice is pre-rendered per canned message (and per preset
+// station) and bundled under assets/voice/. We play the message clip, then the
+// "From <station>" clip. Anything without a clip — e.g. a station renamed to a
+// custom name — falls back to the Web Speech voice so it's never silent.
+const VOICE_DIR = '../assets/voice/';
+
+// Must match the slugs used when the clips were generated: lowercase, and every
+// run of non-alphanumeric characters collapsed to a single dash.
+function voiceSlug(text) {
+  return String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+// Play one bundled clip. Resolves when it finishes; rejects if it can't load
+// (missing file, decode error) so the caller can fall back to spoken text.
+function playClip(file) {
+  return new Promise((resolve, reject) => {
+    const a = new Audio(VOICE_DIR + file);
+    a.onended = resolve;
+    a.onerror = () => reject(new Error('no clip: ' + file));
+    a.play().catch(reject);
+  });
+}
+
+// Speak an incoming page: message clip, then "From <station>" clip. Each half
+// falls back to the system voice independently, so a custom station name still
+// gets announced even though only the message half has a bundled clip.
+async function speakPage(page) {
+  try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch (e) {}
+  const text = page.text || 'Page';
+  const from = page.from || 'Unknown';
+  await playClip(voiceSlug(text) + '.mp3').catch(() => speakAndWait(text));
+  await playClip('from-' + voiceSlug(from) + '.mp3').catch(() => speakAndWait('From ' + from));
+}
+
+// speechSynthesis wrapper that resolves when the utterance finishes (so the
+// message and station halves don't talk over each other in the fallback path).
+function speakAndWait(phrase) {
+  return new Promise((resolve) => {
+    try {
+      if (!('speechSynthesis' in window)) return resolve();
+      const u = new SpeechSynthesisUtterance(phrase);
+      u.rate = 1.0;
+      u.volume = 1.0;
+      u.onend = resolve;
+      u.onerror = resolve;
+      window.speechSynthesis.speak(u);
+    } catch (e) { resolve(); }
+  });
 }
 
 // ---- Spoken page (Web Speech API — no library, no asset) ------------------
