@@ -112,3 +112,37 @@ this machine, but building the Windows installer from Linux/WSL requires
 - Canned messages: edit `MESSAGES` in `ui/renderer.js`.
 - Suggested station names: edit `PRESETS` in `ui/renderer.js`.
 - UDP port: `PORT` in `main.js`.
+
+## Android stations (android/, added 2026-11-05)
+
+An Android tablet can be a station too. It speaks the same UDP protocol on port 41234, so Windows and Android stations
+page each other directly: no server, no internet. The screen is this repo's own `ui/` folder, packed into the app
+unchanged; `android/app/src/main/assets/android-shim.js` gives it the `window.pager` functions that `preload.js`
+gives it on Windows. A change to `ui/` ships to both.
+
+What the Android side adds, because a tablet sleeps:
+- a foreground service (`PagerService.kt`) that keeps listening with the screen off (with a Wi-Fi multicast lock,
+  without which Android drops broadcast packets while asleep) and starts again after a restart (`BootReceiver.kt`);
+- a full-screen alert that wakes the tablet and shows the page over the lock screen, with sound;
+- Android's own text-to-speech for station names without a pre-recorded clip (WebView can't speak).
+
+The protocol logic (`PagerCore.kt`) has no Android in it and is tested against the Windows app's exact packets:
+`cd android && ./gradlew testDebugUnitTest`.
+
+### Build
+Needs JDK 17 and the Android SDK (on Steve's WSL machine: `~/.local/android`):
+```bash
+cd android
+export JAVA_HOME=~/.local/android/jdk-17.0.21+9 ANDROID_HOME=~/.local/android/sdk
+./gradlew assembleRelease      # -> app/build/outputs/apk/release/app-release.apk
+```
+Signing reads `android/keystore.properties` (not in git) pointing at `serene-pager-release.jks`. **Keep that key:
+every update must be signed with it**, or each tablet has to uninstall and reinstall. Bump `versionCode` for each update.
+
+### Install on a tablet (once)
+1. Copy `app-release.apk` to the tablet (USB, or email it to yourself) and open it; allow "install unknown apps" for
+   whichever app opened it.
+2. Open Serene Pager and pick the station name.
+3. Allow notifications, allow it to run in the background ("Don't optimize" / "Unrestricted" battery), and allow
+   full-screen alerts if asked.
+4. Keep the tablet on the office Wi-Fi (not guest Wi-Fi, which hides devices from each other) and plugged in.
